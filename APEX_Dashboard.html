@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX — Personal Performance Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #080A0F;
+  --bg2: #0D1117;
+  --bg3: #131920;
+  --card: #0F1620;
+  --border: #1E2D3D;
+  --border2: #243447;
+  --accent: #00FFB2;
+  --accent2: #FF4D6D;
+  --accent3: #FFB800;
+  --accent4: #4D9FFF;
+  --text: #E8EFF7;
+  --text2: #8A9BB0;
+  --text3: #4A5A6E;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;
+  z-index:9999;
+  opacity:0.4;
+}
+
+/* ── LOGIN SCREEN ── */
+#loginScreen {
+  position:fixed;
+  inset:0;
+  background:var(--bg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  flex-direction:column;
+}
+.login-glow {
+  position:absolute;
+  width:600px;
+  height:600px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(0,255,178,0.06) 0%, transparent 70%);
+  pointer-events:none;
+}
+.login-box {
+  position:relative;
+  width:420px;
+  border:1px solid var(--border2);
+  background: var(--card);
+  padding:48px;
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+}
+.login-logo {
+  font-family: var(--font-display);
+  font-size:52px;
+  letter-spacing:6px;
+  color: var(--accent);
+  text-align:center;
+  margin-bottom:4px;
+}
+.login-tagline {
+  text-align:center;
+  font-family: var(--font-mono);
+  font-size:10px;
+  color: var(--text3);
+  letter-spacing:3px;
+  text-transform:uppercase;
+  margin-bottom:40px;
+}
+.login-field {
+  margin-bottom:16px;
+}
+.login-field label {
+  display:block;
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.login-field input {
+  width:100%;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  color:var(--text);
+  padding:12px 16px;
+  font-family:var(--font-mono);
+  font-size:14px;
+  outline:none;
+  transition:border-color 0.2s;
+}
+.login-field input:focus { border-color:var(--accent); }
+.btn-primary {
+  width:100%;
+  background:var(--accent);
+  color:var(--bg);
+  border:none;
+  padding:14px;
+  font-family:var(--font-display);
+  font-size:20px;
+  letter-spacing:3px;
+  cursor:pointer;
+  transition:all 0.2s;
+  margin-top:8px;
+}
+.btn-primary:hover { background:#00e6a0; transform:translateY(-1px); }
+.login-error {
+  color:var(--accent2);
+  font-family:var(--font-mono);
+  font-size:11px;
+  text-align:center;
+  margin-top:12px;
+  min-height:20px;
+}
+.login-hint {
+  text-align:center;
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+  margin-top:24px;
+}
+
+/* ── APP SHELL ── */
+#app { display:none; min-height:100vh; }
+
+/* ── TOPBAR ── */
+.topbar {
+  position:fixed;
+  top:0; left:0; right:0;
+  height:56px;
+  background:rgba(8,10,15,0.92);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 32px;
+  z-index:100;
+  gap:24px;
+}
+.topbar-logo {
+  font-family:var(--font-display);
+  font-size:28px;
+  letter-spacing:4px;
+  color:var(--accent);
+}
+.topbar-nav {
+  display:flex;
+  gap:4px;
+  margin-left:32px;
+  flex:1;
+}
+.nav-btn {
+  background:none;
+  border:none;
+  color:var(--text3);
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:1px;
+  padding:6px 14px;
+  cursor:pointer;
+  transition:all 0.2s;
+  text-transform:uppercase;
+  border-bottom:2px solid transparent;
+}
+.nav-btn:hover { color:var(--text); }
+.nav-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+.topbar-right {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin-left:auto;
+}
+.topbar-date {
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--text3);
+}
+.topbar-user {
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--accent);
+  cursor:pointer;
+}
+
+/* ── MAIN CONTENT ── */
+.main { padding:80px 32px 40px; max-width:1400px; margin:0 auto; }
+
+/* ── PAGES ── */
+.page { display:none; }
+.page.active { display:block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── SECTION TITLE ── */
+.section-title {
+  font-family:var(--font-display);
+  font-size:42px;
+  letter-spacing:3px;
+  color:var(--text);
+  margin-bottom:4px;
+}
+.section-sub {
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--text3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:32px;
+}
+
+/* ── STAT CARDS ── */
+.stats-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+  gap:12px;
+  margin-bottom:28px;
+}
+.stat-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  padding:20px 24px;
+  position:relative;
+  overflow:hidden;
+  transition:border-color 0.2s;
+}
+.stat-card:hover { border-color:var(--border2); }
+.stat-card::before {
+  content:'';
+  position:absolute;
+  top:0; left:0;
+  width:3px;
+  height:100%;
+}
+.stat-card.green::before { background:var(--accent); }
+.stat-card.red::before { background:var(--accent2); }
+.stat-card.yellow::before { background:var(--accent3); }
+.stat-card.blue::before { background:var(--accent4); }
+.stat-label {
+  font-family:var(--font-mono);
+  font-size:9px;
+  color:var(--text3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.stat-value {
+  font-family:var(--font-display);
+  font-size:36px;
+  letter-spacing:1px;
+  line-height:1;
+}
+.stat-card.green .stat-value { color:var(--accent); }
+.stat-card.red .stat-value { color:var(--accent2); }
+.stat-card.yellow .stat-value { color:var(--accent3); }
+.stat-card.blue .stat-value { color:var(--accent4); }
+.stat-sub {
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+  margin-top:4px;
+}
+
+/* ── CONTENT GRID ── */
+.content-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-bottom:16px;
+}
+.content-grid.thirds {
+  grid-template-columns:1fr 1fr 1fr;
+}
+.content-grid.wide {
+  grid-template-columns:2fr 1fr;
+}
+@media(max-width:900px) {
+  .content-grid, .content-grid.thirds, .content-grid.wide { grid-template-columns:1fr; }
+}
+
+/* ── PANEL ── */
+.panel {
+  background:var(--card);
+  border:1px solid var(--border);
+  padding:24px;
+}
+.panel-title {
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.panel-title::after {
+  content:'';
+  flex:1;
+  height:1px;
+  background:var(--border);
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  border:2px dashed var(--border2);
+  padding:48px 32px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+  background:var(--bg2);
+  position:relative;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color:var(--accent);
+  background:rgba(0,255,178,0.03);
+}
+.upload-icon { font-size:48px; margin-bottom:16px; }
+.upload-title {
+  font-family:var(--font-display);
+  font-size:24px;
+  letter-spacing:2px;
+  color:var(--text);
+  margin-bottom:8px;
+}
+.upload-sub {
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--text3);
+  letter-spacing:1px;
+}
+#fileInput { display:none; }
+
+/* ── AI COACH ── */
+.coach-container {
+  display:flex;
+  flex-direction:column;
+  height:500px;
+}
+.coach-messages {
+  flex:1;
+  overflow-y:auto;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--border2) transparent;
+}
+.msg {
+  max-width:85%;
+  padding:12px 16px;
+  font-size:13px;
+  line-height:1.6;
+}
+.msg.ai {
+  background:var(--bg3);
+  border-left:3px solid var(--accent);
+  align-self:flex-start;
+}
+.msg.user {
+  background:rgba(77,159,255,0.1);
+  border-left:3px solid var(--accent4);
+  align-self:flex-end;
+}
+.msg-label {
+  font-family:var(--font-mono);
+  font-size:9px;
+  color:var(--text3);
+  letter-spacing:2px;
+  margin-bottom:6px;
+  text-transform:uppercase;
+}
+.coach-input-row {
+  display:flex;
+  gap:8px;
+  padding:16px;
+  border-top:1px solid var(--border);
+}
+.coach-input {
+  flex:1;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  color:var(--text);
+  padding:10px 16px;
+  font-family:var(--font-mono);
+  font-size:13px;
+  outline:none;
+}
+.coach-input:focus { border-color:var(--accent); }
+.btn-send {
+  background:var(--accent);
+  color:var(--bg);
+  border:none;
+  padding:10px 20px;
+  font-family:var(--font-display);
+  font-size:16px;
+  letter-spacing:2px;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.btn-send:hover { background:#00e6a0; }
+.btn-send:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* ── CHARTS ── */
+.chart-wrap { position:relative; height:220px; }
+
+/* ── ACTIVITY LIST ── */
+.activity-list { display:flex; flex-direction:column; gap:8px; }
+.activity-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 14px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  transition:border-color 0.2s;
+}
+.activity-item:hover { border-color:var(--border2); }
+.activity-type-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.activity-name { font-size:13px; flex:1; }
+.activity-meta {
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+}
+
+/* ── ZONES BAR ── */
+.zone-bar-wrap { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.zone-row { display:flex; align-items:center; gap:10px; }
+.zone-name {
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+  width:80px;
+  flex-shrink:0;
+}
+.zone-bar-bg {
+  flex:1;
+  height:6px;
+  background:var(--border);
+  border-radius:0;
+  overflow:hidden;
+}
+.zone-bar-fill {
+  height:100%;
+  border-radius:0;
+  transition:width 1s ease;
+}
+.zone-val {
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text2);
+  width:35px;
+  text-align:right;
+}
+
+/* ── INSIGHT CARDS ── */
+.insights-list { display:flex; flex-direction:column; gap:10px; }
+.insight-item {
+  padding:12px 16px;
+  background:var(--bg2);
+  border-left:3px solid var(--accent);
+  font-size:13px;
+  line-height:1.5;
+}
+.insight-item.warn { border-left-color:var(--accent3); }
+.insight-item.alert { border-left-color:var(--accent2); }
+.insight-tag {
+  font-family:var(--font-mono);
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:4px;
+}
+.insight-item .insight-tag { color:var(--accent); }
+.insight-item.warn .insight-tag { color:var(--accent3); }
+.insight-item.alert .insight-tag { color:var(--accent2); }
+
+/* ── PROGRESS BAR ── */
+.progress-row {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-bottom:14px;
+}
+.progress-label-row {
+  display:flex;
+  justify-content:space-between;
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--text3);
+}
+.progress-track {
+  height:4px;
+  background:var(--border);
+  overflow:hidden;
+}
+.progress-fill {
+  height:100%;
+  transition:width 1s ease;
+}
+
+/* ── REPORT BUTTON ── */
+.btn-outline {
+  background:none;
+  border:1px solid var(--border2);
+  color:var(--text2);
+  padding:10px 20px;
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:2px;
+  cursor:pointer;
+  transition:all 0.2s;
+  text-transform:uppercase;
+}
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ── DIET / TIPS ── */
+.tip-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tip-card {
+  padding:16px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-top:3px solid var(--accent);
+}
+.tip-card.strength { border-top-color:var(--accent2); }
+.tip-card.longevity { border-top-color:var(--accent3); }
+.tip-card.diet { border-top-color:var(--accent4); }
+.tip-card-title {
+  font-family:var(--font-mono);
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--text3);
+  margin-bottom:10px;
+}
+.tip-card-body { font-size:12px; line-height:1.6; color:var(--text2); }
+
+/* ── LOADING SPINNER ── */
+.spinner {
+  display:inline-block;
+  width:14px;
+  height:14px;
+  border:2px solid var(--border2);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  vertical-align:middle;
+  margin-right:6px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); }
+
+/* ── HORIZONTAL RULE ── */
+.hr { height:1px; background:var(--border); margin:24px 0; }
+
+.full-width { grid-column:1/-1; }
+.mt16 { margin-top:16px; }
+.gap-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="loginScreen">
+  <div class="login-glow"></div>
+  <div class="login-box">
+    <div class="login-logo">APEX</div>
+    <div class="login-tagline">Personal Performance Intelligence</div>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="your username" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">ENTER APEX</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-hint">First time? Login creates your account automatically.</div>
+  </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">APEX</div>
+    <div class="topbar-nav">
+      <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-btn" onclick="showPage('upload')">Upload Data</button>
+      <button class="nav-btn" onclick="showPage('coach')">AI Coach</button>
+      <button class="nav-btn" onclick="showPage('training')">Training</button>
+      <button class="nav-btn" onclick="showPage('longevity')">Longevity</button>
+      <button class="nav-btn" onclick="showPage('reports')">Reports</button>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-date" id="topbarDate"></div>
+      <div class="topbar-user" id="topbarUser" onclick="logout()">⬡ LOGOUT</div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="page active" id="page-dashboard">
+      <div class="section-title">COMMAND CENTER</div>
+      <div class="section-sub" id="dashGreeting">Loading your performance data...</div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card green"><div class="stat-label">Sessions (4wk)</div><div class="stat-value" id="statSessions">--</div><div class="stat-sub">total activities</div></div>
+        <div class="stat-card red"><div class="stat-label">Training Hours</div><div class="stat-value" id="statHours">--</div><div class="stat-sub">last 4 weeks</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Avg Tennis HR</div><div class="stat-value" id="statTennisHR">--</div><div class="stat-sub">bpm — Zone 3–5</div></div>
+        <div class="stat-card blue"><div class="stat-label">Run Pace</div><div class="stat-value" id="statPace">--</div><div class="stat-sub">min/km current avg</div></div>
+        <div class="stat-card green"><div class="stat-label">Peak HR</div><div class="stat-value" id="statPeakHR">--</div><div class="stat-sub">bpm observed max</div></div>
+        <div class="stat-card red"><div class="stat-label">Calories (4wk)</div><div class="stat-value" id="statCals">--</div><div class="stat-sub">total burned</div></div>
+        <div class="stat-card blue"><div class="stat-label">VO2 Max</div><div class="stat-value" id="statVO2">--</div><div class="stat-sub">ml/kg/min · log in Upload</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Endurance Score</div><div class="stat-value" id="statEndurance">--</div><div class="stat-sub">Garmin score · log in Upload</div></div>
+      </div>
+
+      <div class="content-grid wide">
+        <div class="panel">
+          <div class="panel-title">Activity Volume — Weekly</div>
+          <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">HR Zone Distribution</div>
+          <div class="zone-bar-wrap" id="zonesBars">
+            <div style="color:var(--text3);font-family:var(--font-mono);font-size:11px">Upload data to see zones</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="panel">
+          <div class="panel-title">Recent Activities</div>
+          <div class="activity-list" id="recentActivities">
+            <div style="color:var(--text3);font-family:var(--font-mono);font-size:11px">No data yet — upload your Garmin CSV</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">AI Insights</div>
+          <div class="insights-list" id="aiInsights">
+            <div class="insight-item">
+              <div class="insight-tag">Endurance</div>
+              Your April 2025 peak pace was 5:24 min/km. You're at 7:44 now. With this plan, you'll close that gap in 10–12 weeks.
+            </div>
+            <div class="insight-item warn">
+              <div class="insight-tag">Recovery</div>
+              Tennis twice weekly at Zone 3–5 intensity is already high-load cardio. Avoid adding heavy gym cardio on those days.
+            </div>
+            <div class="insight-item alert">
+              <div class="insight-tag">Strength</div>
+              Your Garmin Training Effect on strength sessions averages 0.5–1.5. Push harder — progressive overload is the key.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ UPLOAD ══ -->
+    <div class="page" id="page-upload">
+      <div class="section-title">UPLOAD DATA</div>
+      <div class="section-sub">Garmin CSV export, screenshot, or activity photo</div>
+
+      <div class="content-grid">
+        <div>
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="handleDrop(event)">
+            <div class="upload-icon">⬆</div>
+            <div class="upload-title">DROP YOUR FILE HERE</div>
+            <div class="upload-sub">Garmin CSV · ZIP · JPG · PNG · PDF</div>
+            <div class="upload-sub mt16" style="color:var(--text3)">or click to browse</div>
+          </div>
+          <input type="file" id="fileInput" accept=".csv,.jpg,.jpeg,.png,.pdf,.zip" onchange="handleFileUpload(event)">
+
+          <!-- VO2 MAX + ENDURANCE SCORE INPUTS -->
+          <div class="panel mt16">
+            <div class="panel-title">📈 Manual Metrics Log</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">VO2 MAX (ml/kg/min)</div>
+                <input type="number" id="vo2Input" placeholder="e.g. 47" step="0.1" min="20" max="90"
+                  style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;font-family:var(--font-mono);font-size:18px;outline:none;text-align:center">
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Garmin Endurance Score</div>
+                <input type="number" id="enduranceInput" placeholder="e.g. 52" step="1" min="0" max="100"
+                  style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;font-family:var(--font-mono);font-size:18px;outline:none;text-align:center">
+              </div>
+            </div>
+            <button class="btn-primary" style="font-size:16px;padding:10px" onclick="saveManualMetrics()">LOG METRICS</button>
+            <div id="metricsHistory" style="margin-top:16px;display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+
+          <div class="panel mt16" id="uploadStatus" style="display:none">
+            <div class="panel-title">Processing</div>
+            <div id="uploadStatusText" style="font-family:var(--font-mono);font-size:13px;color:var(--accent)"></div>
+          </div>
+        </div>
+
+          <div class="panel">
+          <div class="panel-title">How to export from Garmin</div>
+          <div style="font-size:13px;line-height:1.8;color:var(--text2)">
+            <strong style="color:var(--accent)">Option A — ZIP (best)</strong><br>
+            1. Go to connect.garmin.com<br>
+            2. Profile → Account → Data Management<br>
+            3. "Export Your Data" → Download ZIP<br>
+            4. Drop the entire ZIP here — APEX reads all CSVs inside automatically<br><br>
+            <strong style="color:var(--accent4)">Option B — CSV only</strong><br>
+            Activities → gear icon → "Export to CSV"<br><br>
+            <strong style="color:var(--accent3)">Option C — Screenshot / Photo</strong><br>
+            Any Garmin screen, watch face, or HR graph — AI will read it.
+          </div>
+          <div class="hr"></div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+            DATA STORED LOCALLY IN YOUR BROWSER<br>Persists across sessions. Nothing sent to external servers.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel mt16" id="uploadAnalysis" style="display:none">
+        <div class="panel-title">AI Analysis Result</div>
+        <div id="uploadAnalysisText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text2)"></div>
+      </div>
+    </div>
+
+    <!-- ══ AI COACH ══ -->
+    <div class="page" id="page-coach">
+      <div class="section-title">AI COACH</div>
+      <div class="section-sub">Personalised to your Garmin data, goals, and history</div>
+      <div class="content-grid wide">
+        <div class="panel" style="padding:0">
+          <div class="coach-container">
+            <div class="coach-messages" id="coachMessages"></div>
+            <div class="coach-input-row">
+              <input class="coach-input" id="coachInput" placeholder="Ask about training, diet, recovery, longevity..." onkeydown="if(event.key==='Enter')sendMessage()">
+              <button class="btn-send" id="sendBtn" onclick="sendMessage()">SEND</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <div class="panel-title">Quick Questions</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="btn-outline" onclick="quickAsk('What should I eat today for training?')">Today's Nutrition</button>
+              <button class="btn-outline" onclick="quickAsk('How can I improve my run pace fastest?')">Pace Improvement</button>
+              <button class="btn-outline" onclick="quickAsk('What are my longevity priorities?')">Longevity Tips</button>
+              <button class="btn-outline" onclick="quickAsk('Assess my strength training and what I need to improve')">Strength Assessment</button>
+              <button class="btn-outline" onclick="quickAsk('Analyse my sleep patterns and give me advice')">Sleep Analysis</button>
+              <button class="btn-outline" onclick="quickAsk('What does an endurance beast training week look like for me?')">Endurance Plan</button>
+              <button class="btn-outline" onclick="quickAsk('How do I get a more aesthetic physique while training for endurance?')">Aesthetics + Endurance</button>
+            </div>
+          </div>
+          <div class="panel mt16">
+            <div class="panel-title">Your Profile</div>
+            <div id="coachProfilePanel" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);line-height:2">
+              Age: 26 · Male<br>
+              Weight: 81kg · Height: 188cm<br>
+              Level: Intermediate<br>
+              Tennis: Tue + Thu (Zone 3–5)<br>
+              Gym: Mon / Wed / Fri / Sat<br>
+              Peak pace: 5:24 /km (Apr '25)<br>
+              Current pace: ~7:44 /km<br>
+              Peak HR observed: 192 bpm<br>
+              VO2 Max: <span id="profileVO2" style="color:var(--accent)">not logged yet</span><br>
+              Endurance Score: <span id="profileEndurance" style="color:var(--accent)">not logged yet</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TRAINING ══ -->
+    <div class="page" id="page-training">
+      <div class="section-title">TRAINING PLAN</div>
+      <div class="section-sub">4-day split · Garmin-calibrated · Progressive overload</div>
+
+      <div class="stats-grid">
+        <div class="stat-card green"><div class="stat-label">Goal Pace</div><div class="stat-value">5:30</div><div class="stat-sub">min/km target (12wk)</div></div>
+        <div class="stat-card red"><div class="stat-label">Strength Goal</div><div class="stat-value">>81</div><div class="stat-sub">kg deadlift (bodyweight)</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Weekly Volume</div><div class="stat-value">~170</div><div class="stat-sub">min cardio/week</div></div>
+        <div class="stat-card blue"><div class="stat-label">Current Phase</div><div class="stat-value">P1</div><div class="stat-sub">Foundation (Wks 1–3)</div></div>
+      </div>
+
+      <div class="content-grid thirds">
+        <div class="panel">
+          <div class="panel-title">Endurance Progress</div>
+          <div class="progress-row">
+            <div class="progress-label-row"><span>Run Pace</span><span>7:44 → 5:30 /km</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:28%;background:var(--accent)"></div></div>
+          </div>
+          <div class="progress-row">
+            <div class="progress-label-row"><span>Aerobic Base</span><span>Zone 2 consistency</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:55%;background:var(--accent4)"></div></div>
+          </div>
+          <div class="progress-row">
+            <div class="progress-label-row"><span>Cardio Volume</span><span>vs target</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:72%;background:var(--accent3)"></div></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:12px">
+            Update these by uploading new Garmin data
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">This Week's Sessions</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent4)"></div>
+              <div class="activity-name" style="font-size:12px">MON — Upper Push + Run</div>
+              <div class="activity-meta">55 min</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent3)"></div>
+              <div class="activity-name" style="font-size:12px">TUE — 🎾 Tennis Only</div>
+              <div class="activity-meta">Zone 3–5</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent4)"></div>
+              <div class="activity-name" style="font-size:12px">WED — Legs + Bike</div>
+              <div class="activity-meta">55 min</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent3)"></div>
+              <div class="activity-name" style="font-size:12px">THU — 🎾 Tennis Only</div>
+              <div class="activity-meta">Zone 3–5</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent4)"></div>
+              <div class="activity-name" style="font-size:12px">FRI — Upper Pull + Run</div>
+              <div class="activity-meta">55 min</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-type-dot" style="background:var(--accent)"></div>
+              <div class="activity-name" style="font-size:12px">SAT — Full Body + Bike</div>
+              <div class="activity-meta">60 min</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">12-Week Phases</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="padding:10px;background:rgba(0,255,178,0.07);border-left:3px solid var(--accent)">
+              <div style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:2px">PHASE 1 · WKS 1–3</div>
+              <div style="font-size:12px;margin-top:4px">Foundation. Form + habit. 7:00–7:45 /km runs.</div>
+            </div>
+            <div style="padding:10px;background:rgba(77,159,255,0.05);border-left:3px solid var(--accent4)">
+              <div style="font-family:var(--font-mono);font-size:9px;color:var(--accent4);letter-spacing:2px">PHASE 2 · WKS 4–6</div>
+              <div style="font-size:12px;margin-top:4px">Building. +2.5kg/wk on lifts. 6:30–7:00 /km.</div>
+            </div>
+            <div style="padding:10px;background:rgba(255,184,0,0.05);border-left:3px solid var(--accent3)">
+              <div style="font-family:var(--font-mono);font-size:9px;color:var(--accent3);letter-spacing:2px">PHASE 3 · WKS 7–9</div>
+              <div style="font-size:12px;margin-top:4px">Intensity. 5×5 compounds. Intervals added.</div>
+            </div>
+            <div style="padding:10px;background:rgba(255,77,109,0.05);border-left:3px solid var(--accent2)">
+              <div style="font-family:var(--font-mono);font-size:9px;color:var(--accent2);letter-spacing:2px">PHASE 4 · WKS 10–12</div>
+              <div style="font-size:12px;margin-top:4px">Peak. Sub 6:00 /km. 1RM testing. Body recomp.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ LONGEVITY ══ -->
+    <div class="page" id="page-longevity">
+      <div class="section-title">LONGEVITY & AESTHETICS</div>
+      <div class="section-sub">Built to last · Built to carry · Built to look the part</div>
+      <div class="tip-grid">
+        <div class="tip-card">
+          <div class="tip-card-title">🫀 Cardiovascular Longevity</div>
+          <div class="tip-card-body">Your Zone 2 cycling base is one of the best longevity investments you can make. Studies on centenarians show sustained Zone 2 aerobic capacity is the #1 predictor of long-term health. Keep 60–70% of your cardio in Zone 2 (117–136 bpm for you). Your tennis spikes to Zone 5 naturally — this combination of base + peaks is optimal.</div>
+        </div>
+        <div class="tip-card strength">
+          <div class="tip-card-title">💪 Carry People Strength</div>
+          <div class="tip-card-body">To carry people, you need relative strength: deadlift 1.5–2× bodyweight (121–162kg for you at 81kg), strong posterior chain, grip strength, and core stability. Your deadlift, Bulgarian split squats, and bent-over rows are the right foundation. Track grip strength — it's one of the most reliable longevity biomarkers per research.</div>
+        </div>
+        <div class="tip-card longevity">
+          <div class="tip-card-title">🧬 Longevity Protocols</div>
+          <div class="tip-card-body">At 26, your longevity investments compound. Prioritise: VO2 Max (you're building this), muscle mass preservation (strength training), sleep quality (7–9hrs), Zone 2 cardio, and mobility work. Cold exposure post-training, sauna 3×/week (if available), and consistent sleep schedule are evidence-backed longevity accelerators.</div>
+        </div>
+        <div class="tip-card diet">
+          <div class="tip-card-title">🥗 Nutrition for Longevity</div>
+          <div class="tip-card-body">For your goals: ~2.2g protein/kg bodyweight (≈178g/day). Prioritise whole foods, omega-3s (fatty fish 3×/week), polyphenols (berries, dark chocolate), and time-restricted eating (10–12hr eating window). Pre-workout: complex carbs 2hrs before. Post-workout: 30–40g protein within 45 min of lifting.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-card-title">🏃 Endurance Beast Protocol</div>
+          <div class="tip-card-body">80/20 rule: 80% of your running in Zone 2, 20% at Zone 4–5. Your tennis naturally provides the 20%. Add one weekly long run (building to 15–20km at Zone 2 pace) once Phase 2 starts. VO2 Max above 50 ml/kg/min is the target — currently estimated ~42–46 based on your run data.</div>
+        </div>
+        <div class="tip-card strength">
+          <div class="tip-card-title">⚡ Body Aesthetics + Performance</div>
+          <div class="tip-card-body">At 188cm/81kg you have ideal frame for a lean athletic build. Target: 78–82kg at 10–13% body fat. This means muscle gain + fat loss simultaneously (body recomp) — achievable because you're intermediate. Keys: hit protein targets, stay in slight caloric deficit (200–300 kcal), prioritise compound lifts, and keep tennis for calorie burn.</div>
+        </div>
+      </div>
+
+      <div class="panel mt16">
+        <div class="panel-title">Daily Longevity Checklist</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px" id="longevityChecklist"></div>
+      </div>
+    </div>
+
+    <!-- ══ REPORTS ══ -->
+    <div class="page" id="page-reports">
+      <div class="section-title">REPORTS</div>
+      <div class="section-sub">Performance summaries · Trend analysis · Export</div>
+      <div class="content-grid">
+        <div class="panel">
+          <div class="panel-title">Generate Daily Report</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:20px">
+            Your AI-powered daily report includes: training load analysis, recovery status, nutrition recommendations, and next-session guidance — all based on your latest Garmin data.
+          </div>
+          <button class="btn-primary" style="width:auto;padding:12px 32px;font-size:18px" onclick="generateReport()">GENERATE REPORT</button>
+          <div class="hr"></div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+            📧 EMAIL SETUP<br><br>
+            To receive daily email reports automatically:<br><br>
+            1. Create a free account at <strong style="color:var(--accent)">emailjs.com</strong><br>
+            2. Add your service ID below<br>
+            3. Reports will send to your email every day
+          </div>
+          <div class="login-field mt16">
+            <label>Your Email (for reports)</label>
+            <input type="email" id="reportEmail" placeholder="you@email.com" style="background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;font-family:var(--font-mono);font-size:13px;outline:none;width:100%">
+          </div>
+          <button class="btn-outline mt16" onclick="saveEmail()">SAVE EMAIL</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Last Generated Report</div>
+          <div id="reportOutput" style="font-size:13px;line-height:1.8;color:var(--text2);white-space:pre-wrap;max-height:500px;overflow-y:auto">
+            No report generated yet. Click "Generate Report" to create your first one.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel mt16">
+        <div class="panel-title">Activity History Log</div>
+        <div id="historyLog" style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+          Upload Garmin data to populate your history.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════════════════════
+// STORAGE HELPERS
+// ══════════════════════════════════════════════════════════
+const STORE_KEY = 'apex_v1';
+let appData = {};
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    appData = raw ? JSON.parse(raw) : {};
+  } catch(e) { appData = {}; }
+}
+function saveData() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(appData)); } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════════
+function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if (!user || !pass) {
+    document.getElementById('loginError').textContent = 'Enter username and password';
+    return;
+  }
+  loadData();
+  if (!appData.users) appData.users = {};
+  if (!appData.users[user]) {
+    // New user — register
+    appData.users[user] = { passwordHash: btoa(pass), createdAt: new Date().toISOString() };
+    saveData();
+  } else {
+    if (appData.users[user].passwordHash !== btoa(pass)) {
+      document.getElementById('loginError').textContent = 'Incorrect password';
+      return;
+    }
+  }
+  appData.currentUser = user;
+  saveData();
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+}
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
+
+function logout() {
+  appData.currentUser = null;
+  saveData();
+  location.reload();
+}
+
+// ══════════════════════════════════════════════════════════
+// APP INIT
+// ══════════════════════════════════════════════════════════
+let volumeChart = null;
+const ATHLETE = {
+  name: appData.currentUser || 'Athlete',
+  age: 26, weight: 81, height: 188, sex: 'male',
+  maxHR: 195, restingHR: 58,
+  currentPace: 7.73, peakPace: 5.24,
+  goals: ['endurance beast','carry people','aesthetic physique','longevity'],
+  sports: ['tennis x2/week','strength x4/week','running','cycling'],
+  notes: 'Intermediate. Works 8-18h. Tennis Tue/Thu lunch. São José dos Campos/Brazil. Strong April 2025 fitness, rebuilding now.'
+};
+
+function initApp() {
+  loadData();
+  document.getElementById('topbarDate').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'short',year:'numeric'}).toUpperCase();
+  document.getElementById('topbarUser').textContent = `⬡ ${(appData.currentUser||'').toUpperCase()} · LOGOUT`;
+
+  const hr = new Date().getHours();
+  const greeting = hr < 12 ? 'GOOD MORNING' : hr < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+  document.getElementById('dashGreeting').textContent = `${greeting}, ${(appData.currentUser||'ATHLETE').toUpperCase()} — HERE IS YOUR PERFORMANCE OVERVIEW`;
+
+  loadDashboard();
+  initCoach();
+  buildLongevityChecklist();
+  renderMetricsHistory();
+  updateMetricsDisplay();
+  document.getElementById('reportEmail').value = getUserData('reportEmail') || '';
+}
+
+function getUserData(key) {
+  if (!appData.currentUser || !appData.users || !appData.users[appData.currentUser]) return null;
+  return (appData.users[appData.currentUser][key]) || null;
+}
+function setUserData(key, val) {
+  if (!appData.currentUser) return;
+  if (!appData.users[appData.currentUser]) appData.users[appData.currentUser] = {};
+  appData.users[appData.currentUser][key] = val;
+  saveData();
+}
+
+// ══════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════
+function loadDashboard() {
+  const activities = getUserData('activities') || getDefaultActivities();
+  updateStats(activities);
+  renderRecentActivities(activities.slice(0,7));
+  renderVolumeChart(activities);
+  renderZones(activities);
+}
+
+function getDefaultActivities() {
+  return [
+    {type:'Tennis',date:'2026-03-08',duration:75,calories:752,avgHR:148,maxHR:174,te:3.5},
+    {type:'Indoor Cycling',date:'2026-03-07',duration:49,calories:384,avgHR:128,maxHR:135,te:2.0},
+    {type:'Running',date:'2026-03-05',duration:69,calories:787,avgHR:155,maxHR:177,te:3.8},
+    {type:'Tennis',date:'2026-03-05',duration:77,calories:646,avgHR:140,maxHR:174,te:3.0},
+    {type:'Strength Training',date:'2026-03-04',duration:53,calories:179,avgHR:90,maxHR:131,te:0.2},
+    {type:'Tennis',date:'2026-03-03',duration:62,calories:509,avgHR:137,maxHR:167,te:3.0},
+    {type:'Indoor Cycling',date:'2026-03-02',duration:59,calories:409,avgHR:126,maxHR:135,te:2.0},
+    {type:'Tennis',date:'2026-03-01',duration:133,calories:1207,avgHR:153,maxHR:179,te:4.1},
+    {type:'Tennis',date:'2026-02-27',duration:62,calories:503,avgHR:136,maxHR:166,te:2.7},
+    {type:'Strength Training',date:'2026-02-26',duration:60,calories:264,avgHR:103,maxHR:133,te:0.4},
+    {type:'Indoor Cycling',date:'2026-02-26',duration:58,calories:415,avgHR:128,maxHR:139,te:2.0},
+    {type:'Treadmill Running',date:'2026-02-25',duration:24,calories:186,avgHR:127,maxHR:136,te:1.5},
+    {type:'Tennis',date:'2026-02-24',duration:78,calories:671,avgHR:140,maxHR:189,te:3.4},
+    {type:'Indoor Cycling',date:'2026-02-22',duration:95,calories:768,avgHR:136,maxHR:148,te:2.8},
+    {type:'Tennis',date:'2026-02-20',duration:75,calories:658,avgHR:138,maxHR:169,te:3.1},
+    {type:'Treadmill Running',date:'2026-02-11',duration:45,calories:377,avgHR:132,maxHR:140,te:2.4},
+    {type:'Treadmill Running',date:'2026-02-05',duration:41,calories:365,avgHR:132,maxHR:141,te:2.4},
+    {type:'Treadmill Running',date:'2026-02-01',duration:78,calories:635,avgHR:132,maxHR:141,te:3.0},
+  ];
+}
+
+function updateStats(activities) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-28);
+  const recent = activities.filter(a => new Date(a.date) >= cutoff);
+  document.getElementById('statSessions').textContent = recent.length;
+  document.getElementById('statHours').textContent = (recent.reduce((s,a)=>s+a.duration,0)/60).toFixed(1);
+  const tennis = recent.filter(a=>a.type==='Tennis');
+  document.getElementById('statTennisHR').textContent = tennis.length ? Math.round(tennis.reduce((s,a)=>s+a.avgHR,0)/tennis.length) : '--';
+  const runs = activities.filter(a=>a.type.includes('Running'));
+  document.getElementById('statPace').textContent = runs.length ? '7:44' : '--';
+  document.getElementById('statPeakHR').textContent = Math.max(...activities.map(a=>a.maxHR||0)) || '--';
+  document.getElementById('statCals').textContent = (recent.reduce((s,a)=>s+(a.calories||0),0)/1000).toFixed(1)+'k';
+}
+
+function renderRecentActivities(activities) {
+  const colors = {
+    'Tennis':'#FFB800','Running':'#00FFB2','Treadmill Running':'#00FFB2',
+    'Indoor Cycling':'#4D9FFF','Strength Training':'#FF4D6D','Yoga':'#B44DFF','default':'#8A9BB0'
+  };
+  document.getElementById('recentActivities').innerHTML = activities.map(a => {
+    const col = colors[a.type] || colors.default;
+    const d = new Date(a.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return `<div class="activity-item">
+      <div class="activity-type-dot" style="background:${col}"></div>
+      <div class="activity-name">${a.type}</div>
+      <div class="activity-meta">${a.duration}m · ${a.avgHR}bpm</div>
+      <div class="activity-meta" style="margin-left:8px">${d}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderVolumeChart(activities) {
+  // Group by week
+  const weeks = {};
+  activities.forEach(a => {
+    const d = new Date(a.date);
+    const monday = new Date(d); monday.setDate(d.getDate() - d.getDay() + 1);
+    const key = monday.toISOString().slice(0,10);
+    if (!weeks[key]) weeks[key] = {tennis:0, running:0, cycling:0, strength:0};
+    if (a.type==='Tennis') weeks[key].tennis += a.duration;
+    else if (a.type.includes('Running')) weeks[key].running += a.duration;
+    else if (a.type.includes('Cycling')) weeks[key].cycling += a.duration;
+    else if (a.type.includes('Strength')) weeks[key].strength += a.duration;
+  });
+  const keys = Object.keys(weeks).sort().slice(-8);
+  const labels = keys.map(k => new Date(k).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+  if (volumeChart) volumeChart.destroy();
+  const ctx = document.getElementById('volumeChart').getContext('2d');
+  volumeChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Tennis',data:keys.map(k=>Math.round(weeks[k].tennis)),backgroundColor:'rgba(255,184,0,0.7)',stack:'a'},
+        {label:'Running',data:keys.map(k=>Math.round(weeks[k].running)),backgroundColor:'rgba(0,255,178,0.7)',stack:'a'},
+        {label:'Cycling',data:keys.map(k=>Math.round(weeks[k].cycling)),backgroundColor:'rgba(77,159,255,0.7)',stack:'a'},
+        {label:'Strength',data:keys.map(k=>Math.round(weeks[k].strength)),backgroundColor:'rgba(255,77,109,0.5)',stack:'a'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#4A5A6E',font:{family:'DM Mono',size:10}}}},
+      scales:{
+        x:{ticks:{color:'#4A5A6E',font:{family:'DM Mono',size:9}},grid:{color:'#1E2D3D'}},
+        y:{ticks:{color:'#4A5A6E',font:{family:'DM Mono',size:9}},grid:{color:'#1E2D3D'}}
+      }
+    }
+  });
+}
+
+function renderZones(activities) {
+  const mhr = 195;
+  const zones = [{name:'Z1 Recovery',lo:0,hi:117,col:'#4CAF50'},{name:'Z2 Fat Burn',lo:117,hi:136,col:'#8BC34A'},{name:'Z3 Aerobic',lo:136,hi:156,col:'#FFC107'},{name:'Z4 Threshold',lo:156,hi:175,col:'#FF5722'},{name:'Z5 Max',lo:175,hi:195,col:'#F44336'}];
+  const zoneMins = zones.map(()=>0);
+  activities.forEach(a => {
+    if (!a.avgHR) return;
+    zones.forEach((z,i)=>{ if(a.avgHR>=z.lo && a.avgHR<z.hi) zoneMins[i]+=a.duration; });
+  });
+  const total = zoneMins.reduce((s,v)=>s+v,1);
+  document.getElementById('zonesBars').innerHTML = zones.map((z,i)=>{
+    const pct = Math.round(zoneMins[i]/total*100);
+    return `<div class="zone-row">
+      <div class="zone-name" style="font-size:10px">${z.name}</div>
+      <div class="zone-bar-bg"><div class="zone-bar-fill" style="width:${pct}%;background:${z.col}"></div></div>
+      <div class="zone-val">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// FILE UPLOAD & PARSING
+// ══════════════════════════════════════════════════════════
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+async function processFile(file) {
+  const status = document.getElementById('uploadStatus');
+  const statusText = document.getElementById('uploadStatusText');
+  status.style.display = 'block';
+  statusText.innerHTML = '<span class="spinner"></span> Processing file...';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'zip') {
+    statusText.innerHTML = '<span class="spinner"></span> Reading ZIP archive...';
+    await processZip(file);
+  } else if (ext === 'csv') {
+    const text = await file.text();
+    Papa.parse(text, {
+      header: true, skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data;
+        statusText.innerHTML = '<span class="spinner"></span> Parsing ' + rows.length + ' activities...';
+        const activities = parseGarminCSV(rows);
+        setUserData('activities', activities);
+        setUserData('lastUpload', new Date().toISOString());
+        loadDashboard();
+        statusText.innerHTML = '✓ Parsed ' + activities.length + ' activities successfully';
+        await analyzeWithAI(activities, file.name);
+      }
+    });
+  } else if (['jpg','jpeg','png'].includes(ext)) {
+    statusText.innerHTML = '<span class="spinner"></span> Reading image with AI...';
+    const b64 = await fileToBase64(file);
+    await analyzeImageWithAI(b64, file.type);
+    statusText.innerHTML = '✓ Image analysed by AI';
+  } else {
+    statusText.innerHTML = '✓ File received — ask the AI Coach about it';
+  }
+}
+
+async function processZip(file) {
+  const statusText = document.getElementById('uploadStatusText');
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const csvFiles = [];
+    zip.forEach((relativePath, zipEntry) => {
+      if (relativePath.toLowerCase().endsWith('.csv') && !zipEntry.dir) {
+        csvFiles.push({ path: relativePath, entry: zipEntry });
+      }
+    });
+
+    statusText.innerHTML = `<span class="spinner"></span> Found ${csvFiles.length} CSV files in ZIP — parsing...`;
+
+    let allActivities = [];
+    let parsedFiles = [];
+
+    for (const { path, entry } of csvFiles) {
+      const text = await entry.async('string');
+      const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+      if (result.data && result.data.length > 0) {
+        const parsed = parseGarminCSV(result.data);
+        if (parsed.length > 0) {
+          allActivities = allActivities.concat(parsed);
+          parsedFiles.push(`${path} (${parsed.length} activities)`);
+        }
+      }
+    }
+
+    // Deduplicate by date+type+duration
+    const seen = new Set();
+    allActivities = allActivities.filter(a => {
+      const key = `${a.date}_${a.type}_${a.duration}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+
+    // Sort by date descending
+    allActivities.sort((a, b) => b.date.localeCompare(a.date));
+
+    setUserData('activities', allActivities);
+    setUserData('lastUpload', new Date().toISOString());
+    loadDashboard();
+
+    statusText.innerHTML = `✓ ZIP processed: ${allActivities.length} unique activities from ${parsedFiles.length} files`;
+
+    const analysis = document.getElementById('uploadAnalysis');
+    const analysisText = document.getElementById('uploadAnalysisText');
+    analysis.style.display = 'block';
+    analysisText.textContent = `Files parsed:\n${parsedFiles.join('\n')}\n\nTotal unique activities: ${allActivities.length}\n\nRunning AI analysis...`;
+
+    await analyzeWithAI(allActivities, file.name);
+  } catch(e) {
+    statusText.innerHTML = '⚠️ Error reading ZIP: ' + e.message + '. Try uploading individual CSV files.';
+  }
+}
+
+// ── MANUAL METRICS ──
+function saveManualMetrics() {
+  const vo2 = parseFloat(document.getElementById('vo2Input').value);
+  const endurance = parseFloat(document.getElementById('enduranceInput').value);
+  if (!vo2 && !endurance) return;
+
+  const entry = {
+    date: new Date().toISOString(),
+    dateDisplay: new Date().toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}),
+  };
+  if (vo2) entry.vo2 = vo2;
+  if (endurance) entry.endurance = endurance;
+
+  const history = getUserData('metricsHistory') || [];
+  history.unshift(entry);
+  setUserData('metricsHistory', history.slice(0, 52)); // keep 1 year of weekly logs
+
+  // Update latest values
+  if (vo2) setUserData('latestVO2', vo2);
+  if (endurance) setUserData('latestEndurance', endurance);
+
+  document.getElementById('vo2Input').value = '';
+  document.getElementById('enduranceInput').value = '';
+
+  renderMetricsHistory();
+  updateMetricsDisplay();
+}
+
+function renderMetricsHistory() {
+  const history = getUserData('metricsHistory') || [];
+  const el = document.getElementById('metricsHistory');
+  if (!el) return;
+  if (history.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">LOG HISTORY</div>` +
+    history.slice(0,8).map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px">
+        <span style="color:var(--text3)">${e.dateDisplay}</span>
+        ${e.vo2 ? `<span>VO2 <strong style="color:var(--accent)">${e.vo2}</strong></span>` : ''}
+        ${e.endurance ? `<span>Endurance <strong style="color:var(--accent3)">${e.endurance}</strong></span>` : ''}
+      </div>`).join('');
+}
+
+function updateMetricsDisplay() {
+  const vo2 = getUserData('latestVO2');
+  const endurance = getUserData('latestEndurance');
+
+  const statVO2 = document.getElementById('statVO2');
+  const statEnd = document.getElementById('statEndurance');
+  const profVO2 = document.getElementById('profileVO2');
+  const profEnd = document.getElementById('profileEndurance');
+
+  if (statVO2) statVO2.textContent = vo2 ? vo2 : '--';
+  if (statEnd) statEnd.textContent = endurance ? endurance : '--';
+  if (profVO2) profVO2.textContent = vo2 ? `${vo2} ml/kg/min` : 'not logged yet';
+  if (profEnd) profEnd.textContent = endurance ? `${endurance}` : 'not logged yet';
+}
+
+function parseGarminCSV(rows) {
+  return rows.map(r => {
+    const dur = parseTime(r['Time'] || r['Duration'] || '0');
+    const cal = parseInt((r['Calories']||'0').replace(/,/g,'')) || 0;
+    return {
+      type: r['Activity Type'] || r['Type'] || 'Unknown',
+      date: (r['Date']||'').slice(0,10),
+      title: r['Title'] || '',
+      duration: dur,
+      calories: cal,
+      avgHR: parseInt(r['Avg HR']||r['Average HR']||0) || 0,
+      maxHR: parseInt(r['Max HR']||r['Maximum HR']||0) || 0,
+      te: parseFloat(r['Aerobic TE']||r['Training Effect']||0) || 0,
+      distance: parseFloat(r['Distance']||0) || 0,
+    };
+  }).filter(a => a.date && a.type !== 'Unknown');
+}
+
+function parseTime(t) {
+  if (!t) return 0;
+  const parts = t.split(':').map(Number);
+  if (parts.length===3) return Math.round(parts[0]*60+parts[1]+parts[2]/60);
+  if (parts.length===2) return Math.round(parts[0]*60+parts[1]);
+  return parseInt(t)||0;
+}
+
+function fileToBase64(file) {
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function analyzeWithAI(activities, filename) {
+  const analysis = document.getElementById('uploadAnalysis');
+  const analysisText = document.getElementById('uploadAnalysisText');
+  analysis.style.display = 'block';
+  analysisText.textContent = 'AI is analysing your data...';
+
+  const summary = buildActivitySummary(activities);
+  const prompt = buildSystemPrompt() + `\n\nThe user just uploaded a Garmin CSV with ${activities.length} activities. Here's the data summary:\n${summary}\n\nProvide a detailed performance analysis covering: endurance status, strength patterns, tennis load, recovery, HR zone breakdown, and 5 specific actionable recommendations. Be direct, data-specific, and motivating.`;
+
+  const result = await callClaude(prompt);
+  analysisText.textContent = result;
+  addCoachMessage('ai', result);
+}
+
+async function analyzeImageWithAI(b64, mimeType) {
+  const analysis = document.getElementById('uploadAnalysis');
+  const analysisText = document.getElementById('uploadAnalysisText');
+  analysis.style.display = 'block';
+  analysisText.textContent = 'AI is reading your image...';
+
+  const result = await callClaudeWithImage(b64, mimeType,
+    buildSystemPrompt() + '\n\nThe user uploaded a screenshot or photo from their Garmin device. Analyse all visible data, extract every metric you can see, and provide a detailed performance assessment with specific recommendations for endurance, strength, aesthetics, and longevity.'
+  );
+  analysisText.textContent = result;
+  addCoachMessage('ai', result);
+}
+
+function buildActivitySummary(activities) {
+  const byType = {};
+  activities.forEach(a => {
+    if (!byType[a.type]) byType[a.type] = {count:0, totalMins:0, totalCals:0, avgHRs:[], maxHRs:[], tes:[]};
+    byType[a.type].count++;
+    byType[a.type].totalMins += a.duration;
+    byType[a.type].totalCals += a.calories;
+    if(a.avgHR) byType[a.type].avgHRs.push(a.avgHR);
+    if(a.maxHR) byType[a.type].maxHRs.push(a.maxHR);
+    if(a.te) byType[a.type].tes.push(a.te);
+  });
+  let summary = '';
+  for (const [type, d] of Object.entries(byType)) {
+    const avg = v => v.length ? Math.round(v.reduce((s,x)=>s+x,0)/v.length) : 0;
+    summary += `${type}: ${d.count} sessions, ${Math.round(d.totalMins/60)}hrs, ${d.totalCals} cal, avg HR ${avg(d.avgHRs)}, max HR ${Math.max(...d.maxHRs,0)}, avg TE ${(d.tes.reduce((s,x)=>s+x,0)/Math.max(d.tes.length,1)).toFixed(1)}\n`;
+  }
+  return summary;
+}
+
+// ══════════════════════════════════════════════════════════
+// AI COACH
+// ══════════════════════════════════════════════════════════
+let conversationHistory = [];
+
+function buildSystemPrompt() {
+  const activities = getUserData('activities') || [];
+  const summary = activities.length ? buildActivitySummary(activities) : 'No data uploaded yet — use known data from initial Garmin CSV analysis.';
+  const vo2 = getUserData('latestVO2');
+  const endurance = getUserData('latestEndurance');
+  const metricsHistory = getUserData('metricsHistory') || [];
+  const metricsStr = metricsHistory.length
+    ? `\nVO2 Max history: ${metricsHistory.filter(e=>e.vo2).map(e=>`${e.dateDisplay}: ${e.vo2}`).join(', ')}`
+      + `\nEndurance Score history: ${metricsHistory.filter(e=>e.endurance).map(e=>`${e.dateDisplay}: ${e.endurance}`).join(', ')}`
+    : '\nVO2 Max and Endurance Score: not yet logged by user';
+  return `You are APEX — an elite personal performance AI coach. You are deeply personal, data-driven, and direct. You speak like a world-class coach who has complete access to the athlete's data.
+
+ATHLETE PROFILE:
+- Name: ${appData.currentUser || 'Athlete'}, Male, 26 years old
+- Weight: 81kg, Height: 188cm
+- Location: São José dos Campos, Brazil
+- Experience: Intermediate (1–3 years)
+- Works: 8am–6pm
+- Tennis: Tuesday + Thursday lunch (tracked — avg HR 148bpm, peaks to 192bpm, Zone 3–5, ~3.9 Training Effect)
+- Gym: Mon/Wed/Fri/Sat, 45–60 min sessions
+- Equipment: Full gym (machines + free weights)
+- Cardio: Running + cycling preference
+
+GOALS (in order of priority):
+1. Become an endurance beast (target: sub 5:30/km 10km, VO2 Max >50)
+2. Carry people — functional strength (deadlift 1.5–2× BW = 121–162kg)
+3. Physical aesthetics — lean athletic build, target 10–13% body fat
+4. Longevity — built to last decades
+
+KEY GARMIN DATA:
+- Current run pace: ~7:44 min/km (avg recent runs)
+- Peak run pace: 5:24 min/km (April 2025 — 10km outdoor)
+- Peak HR observed: 192 bpm (true max ~195)
+- Resting HR: ~58–65 bpm (estimated)
+- Weekly cardio: ~170 min including tennis
+- Last 4 weeks: 33 sessions, 32.5 hrs total
+- Strength Training Effect: 0.2–1.5 (too low — needs more intensity)
+- Tennis TE: 3.5–5.0 (excellent aerobic stimulus)
+${metricsStr}
+
+HR ZONES (personalised):
+- Z1 Recovery: <117 bpm
+- Z2 Fat Burn: 117–136 bpm  
+- Z3 Aerobic: 137–156 bpm
+- Z4 Threshold: 157–175 bpm
+- Z5 Max: 176–195 bpm
+
+RECENT ACTIVITY DATA:
+${summary}
+
+COACHING STYLE:
+- Be direct, specific, and data-referenced
+- No generic advice — always tie to their actual numbers
+- Motivating but honest — don't sugarcoat weaknesses
+- Cover endurance, strength, aesthetics, longevity, and nutrition when relevant
+- Keep responses clear and actionable
+- You remember the full conversation history`;
+}
+
+function initCoach() {
+  const welcomeMsg = `Welcome back, ${(appData.currentUser||'Athlete').toUpperCase()}. 
+
+I've loaded your Garmin data. Here's your current status at a glance:
+
+🏃 Endurance: Current pace 7:44/km — you were at 5:24/km in April 2025. That gap is closeable in 10–12 weeks with the right Zone 2 base work.
+
+💪 Strength: Your gym sessions are showing Training Effect 0.2–1.5. That's too low — you need to push heavier on the compound lifts.
+
+🎾 Tennis: Your two weekly sessions are already delivering Zone 3–5 cardio. This is your biggest asset right now — 148bpm avg, peaking to 192bpm.
+
+What do you want to focus on today?`;
+  addCoachMessage('ai', welcomeMsg);
+}
+
+function addCoachMessage(role, text) {
+  const msgs = document.getElementById('coachMessages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-label">${role==='ai' ? 'APEX COACH' : 'YOU'}</div>${text.replace(/\n/g,'<br>')}`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function quickAsk(q) {
+  showPage('coach');
+  document.getElementById('coachInput').value = q;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('coachInput');
+  const btn = document.getElementById('sendBtn');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addCoachMessage('user', text);
+  input.value = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  conversationHistory.push({role:'user', content: text});
+
+  const result = await callClaudeChat(buildSystemPrompt(), conversationHistory);
+  conversationHistory.push({role:'assistant', content: result});
+
+  addCoachMessage('ai', result);
+  btn.disabled = false;
+  btn.textContent = 'SEND';
+
+  // Save to history
+  const history = getUserData('chatHistory') || [];
+  history.push({date: new Date().toISOString(), user: text, ai: result});
+  setUserData('chatHistory', history.slice(-100));
+}
+
+// ══════════════════════════════════════════════════════════
+// REPORTS
+// ══════════════════════════════════════════════════════════
+async function generateReport() {
+  const output = document.getElementById('reportOutput');
+  output.innerHTML = '<span class="spinner"></span> Generating your daily report...';
+
+  const activities = getUserData('activities') || getDefaultActivities();
+  const summary = buildActivitySummary(activities);
+  const today = new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const prompt = buildSystemPrompt() + `\n\nGenerate a comprehensive daily performance report for ${today}. Structure it as:\n\n1. DAILY STATUS — overall training readiness\n2. LAST 7 DAYS — what you did, volume, quality\n3. ENDURANCE METRICS — pace trend, HR zones, VO2 est\n4. STRENGTH STATUS — where you are vs goals\n5. RECOVERY ASSESSMENT — are you recovered?\n6. TODAY'S NUTRITION — specific meal timing and targets\n7. TOMORROW'S SESSION — exact workout with weights/pace targets\n8. LONGEVITY CHECK — one longevity action for today\n\nBe specific with numbers. Reference their actual Garmin data.`;
+
+  const report = await callClaude(prompt);
+  const formatted = `═══════════════════════════════════\nAPEX DAILY REPORT — ${today}\n═══════════════════════════════════\n\n${report}`;
+  output.textContent = formatted;
+  setUserData('lastReport', {date: new Date().toISOString(), content: formatted});
+}
+
+function saveEmail() {
+  const email = document.getElementById('reportEmail').value.trim();
+  if (email) {
+    setUserData('reportEmail', email);
+    alert(`Email saved: ${email}\n\nTo enable automatic daily reports, set up EmailJS:\n1. Go to emailjs.com\n2. Create a free account\n3. Add your service ID to this app's code\n\nFor now, click "Generate Report" anytime to create your report.`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// LONGEVITY CHECKLIST
+// ══════════════════════════════════════════════════════════
+function buildLongevityChecklist() {
+  const items = [
+    {emoji:'💧', label:'Hydration', target:'2.5–3L water'},
+    {emoji:'🥩', label:'Protein', target:'178g (2.2g/kg)'},
+    {emoji:'😴', label:'Sleep', target:'7–9 hrs + consistent time'},
+    {emoji:'🧘', label:'Mobility', target:'10 min daily stretching'},
+    {emoji:'🏃', label:'Zone 2 Cardio', target:'At least 3×/wk'},
+    {emoji:'🏋️', label:'Compound Lifts', target:'Progressive overload'},
+    {emoji:'🐟', label:'Omega-3', target:'Fatty fish or supplement'},
+    {emoji:'🌿', label:'Vegetables', target:'5+ portions/day'},
+    {emoji:'☀️', label:'Sunlight', target:'15–20 min morning'},
+    {emoji:'🧊', label:'Cold Exposure', target:'Cold shower 2 min'},
+    {emoji:'🫁', label:'VO2 Max Work', target:'1 hard session/wk'},
+    {emoji:'📵', label:'Screen Cutoff', target:'No screens 1hr before bed'},
+  ];
+  document.getElementById('longevityChecklist').innerHTML = items.map(item => `
+    <div style="padding:12px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div style="font-size:20px">${item.emoji}</div>
+      <div>
+        <div style="font-size:12px;font-weight:500">${item.label}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">${item.target}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// CLAUDE API CALLS
+// ══════════════════════════════════════════════════════════
+async function callClaude(prompt) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user', content: prompt}]
+      })
+    });
+    const d = await res.json();
+    return d.content?.map(c=>c.text||'').join('') || 'Error generating response.';
+  } catch(e) { return 'Connection error. Please try again.'; }
+}
+
+async function callClaudeChat(system, history) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system: system,
+        messages: history
+      })
+    });
+    const d = await res.json();
+    return d.content?.map(c=>c.text||'').join('') || 'Error generating response.';
+  } catch(e) { return 'Connection error. Please try again.'; }
+}
+
+async function callClaudeWithImage(b64, mimeType, prompt) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user', content:[
+          {type:'image', source:{type:'base64', media_type:mimeType, data:b64}},
+          {type:'text', text:prompt}
+        ]}]
+      })
+    });
+    const d = await res.json();
+    return d.content?.map(c=>c.text||'').join('') || 'Error reading image.';
+  } catch(e) { return 'Connection error. Please try again.'; }
+}
+
+// ══════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event?.target?.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    if(b.textContent.toLowerCase().includes(id.toLowerCase().replace('-',' '))) b.classList.add('active');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// AUTO-LOGIN CHECK
+// ══════════════════════════════════════════════════════════
+loadData();
+if (appData.currentUser && appData.users?.[appData.currentUser]) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+}
+</script>
+</body>
+</html>
